@@ -1,0 +1,54 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: nginx-golden-image
+spec:
+  params:
+  - name: git-url
+    type: string
+    description: url of the git repo for the code of deployment
+    default: "https://github.com/golden-image-example/nginx"
+  - name: git-revision
+    type: string
+    description: revision to be used from repo of the code for deployment
+    default: main
+  - name: nginx-containerfile-location
+    type: string
+    default: "1.22/Containerfile"
+  - name: nginx-image-name
+    type: string
+    default: "image-registry.openshift-image-registry.svc:5000/golden-image-example/nginx:1.22"
+  tasks:
+  - name: fetch-repository
+    taskRef:
+      name: git-clone
+      kind: ClusterTask
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+    params:
+    - name: url
+      value: $(params.git-url)
+    - name: subdirectory
+      value: ""
+    - name: deleteExisting
+      value: "true"
+    - name: revision
+      value: $(params.git-revision)
+  - name: build-and-push-nginx-image
+    taskRef:
+      name: buildah
+      kind: ClusterTask
+    params:
+    - name: IMAGE
+      value: $(params.nginx-image-name)
+    - name: DOCKERFILE
+      value: $(params.nginx-containerfile-location)
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+    runAfter:
+    - fetch-repository
+  workspaces:
+    - name: shared-workspace
